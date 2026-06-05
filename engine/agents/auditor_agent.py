@@ -1,28 +1,24 @@
-from engine.prompts.auditor_prompt import auditor_prompt
-from engine.llm.ollama_client import call_llm
+from engine.prompts.creator_prompt import build_auditor_prompt
 
-def auditor_agent(state):
+
+def auditor_agent(state: dict) -> dict:
     profile = state["user_profile"]
+    client = state["client"]
+    model = state["model"]
 
-    prompt = f"""
-You are a LinkedIn branding expert.
+    prompt = build_auditor_prompt(profile)
 
-From this user profile, extract ONLY writing style hints.
+    try:
+        if hasattr(client, "list_models"):  # OllamaClient
+            insights = client.generate(prompt, model=model)
+        else:  # GeminiClient
+            insights = client.generate(prompt)
+        state["auditor_insights"] = insights
+    except Exception as exc:
+        state["error"] = f"Auditor agent failed: {exc}"
+        state["auditor_insights"] = (
+            "Position as an industry expert. Focus on educational insights, "
+            "clear frameworks, and direct value to the target audience."
+        )
 
-Return ONLY a short bullet list of:
-- Preferred tone
-- Audience focus
-- Content angle
-
-Do NOT explain.
-Do NOT write paragraphs.
-Do NOT add examples.
-
-User profile:
-{profile}
-"""
-
-    patterns = call_llm(prompt)
-
-    state["patterns"] = [patterns]
     return state

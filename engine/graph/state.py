@@ -1,11 +1,13 @@
-from typing import TypedDict, List, Dict
+from typing import Any, Dict, List, TypedDict
+
 
 class AgentState(TypedDict):
-    user_profile: Dict
-    patterns: List[str]
-    insights: str
-    weekly_posts: List[str]
-    emoji_level: int
-    post_length: int
-    include_question: bool
-    hashtag_count: int
+    user_profile: Dict[str, Any]
+    settings: Dict[str, Any]
+    reference_posts: List[Dict[str, Any]]
+    auditor_insights: str
+    analyst_patterns: str
+    weekly_plan: Dict[str, Any]
+    error: str
+    client: Any
+    model: str

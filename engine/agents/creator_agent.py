@@ -1,44 +1,38 @@
-from engine.llm.ollama_client import call_llm
-import json
-import re
+from engine.prompts.creator_prompt import build_creator_prompt
 
-def creator_agent(state):
+
+def creator_agent(state: dict) -> dict:
     profile = state["user_profile"]
-    patterns = state["patterns"]
+    settings = state["settings"]
+    auditor_insights = state.get("auditor_insights", "")
+    analyst_patterns = state.get("analyst_patterns", "")
+    client = state["client"]
+    model = state["model"]
 
-    prompt = f"""
-You are an AI LinkedIn Growth Engine.
+    prompt = build_creator_prompt(profile, settings, auditor_insights, analyst_patterns)
 
-User profile:
-{profile}
+    schema = {
+        "summary": "One short sentence summarizing the week's approach",
+        "posts": [
+            {
+                "day": "Monday",
+                "angle": "Brief theme description",
+                "hook": "Strong opening line",
+                "post": "Main body text formatted with line breaks",
+                "hashtags": ["#Topic"],
+                "cta": "Engaging CTA / Question"
+            }
+        ]
+    }
 
-Winning LinkedIn patterns:
-{patterns}
+    try:
+        if hasattr(client, "list_models"):  # OllamaClient
+            plan = client.generate_json(prompt, schema=schema, model=model)
+        else:  # GeminiClient
+            plan = client.generate_json(prompt, schema=schema)
+        state["weekly_plan"] = plan
+    except Exception as exc:
+        state["error"] = f"Creator agent failed: {exc}"
+        state["weekly_plan"] = {}
 
-Generate a 7-day LinkedIn content plan.
-Each post must:
-- Follow the hook & CTA patterns
-- Match the tone and audience
-- Include hashtags
-
-Return STRICT JSON in this format:
-[
-  {{
-    "day": "Monday",
-    "type": "Story / Tip / Hiring / Personal",
-    "post": "Full LinkedIn post",
-    "hashtags": ["#AI", "#Careers"]
-  }}
-]
-"""
-
-    raw = call_llm(prompt)
-
-    match = re.search(r"\[.*\]", raw, re.S)
-    if match:
-        data = json.loads(match.group())
-    else:
-        data = []
-
-    state["weekly_posts"] = data
     return state

@@ -1,32 +1,25 @@
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.vectorstores import FAISS
-from engine.llm.ollama_client import call_llm
+from engine.prompts.creator_prompt import build_analyst_prompt
 
-def analyst_agent(state):
-    embeddings = OllamaEmbeddings(model="mistral")
-    db = FAISS.load_local(
-    "vector_db",
-    embeddings,
-    allow_dangerous_deserialization=True
-)
 
-    niche = state["user_profile"]["expertise"]
+def analyst_agent(state: dict) -> dict:
+    reference_posts = state.get("reference_posts", [])
+    client = state["client"]
+    model = state["model"]
 
-    docs = db.similarity_search(niche, k=5)
-    examples = "\n".join([d.page_content for d in docs])
+    prompt = build_analyst_prompt(reference_posts)
 
-    prompt = f"""
-These are high-performing LinkedIn posts:
-{examples}
+    try:
+        if hasattr(client, "list_models"):  # OllamaClient
+            patterns = client.generate(prompt, model=model)
+        else:  # GeminiClient
+            patterns = client.generate(prompt)
+        state["analyst_patterns"] = patterns
+    except Exception as exc:
+        state["error"] = f"Analyst agent failed: {exc}"
+        state["analyst_patterns"] = (
+            "- Hook pattern: Start with a personal insight, hook-driven quote, or failure-to-success narrative.\n"
+            "- Structure: Break thoughts into single-line spacings. Use bullet points for list details.\n"
+            "- CTA pattern: End with a soft, relevant question or call-to-action that encourages comment engagement."
+        )
 
-Analyze them and extract:
-- Hook patterns
-- CTA styles
-- Content formats
-
-Return bullet points only.
-"""
-
-    patterns = call_llm(prompt)
-    state["patterns"] = patterns
     return state
